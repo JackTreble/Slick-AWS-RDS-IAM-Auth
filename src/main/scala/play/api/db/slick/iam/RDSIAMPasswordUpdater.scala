@@ -2,8 +2,6 @@ package play.api.db.slick.iam
 
 import java.util.Properties
 
-import java.util.Properties
-
 import akka.actor.ActorSystem
 import com.google.inject.Inject
 import com.zaxxer.hikari.pool.HikariPool
@@ -17,8 +15,6 @@ import slick.jdbc.hikaricp.HikariCPJdbcDataSource
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
 
 @Singleton
 class RDSIAMPasswordUpdater @Inject()(
@@ -26,8 +22,6 @@ class RDSIAMPasswordUpdater @Inject()(
     environment: Environment,
     configuration: Configuration,
     actorSystem: ActorSystem)(implicit executionContext: ExecutionContext) {
-  private val config      = configuration.underlying
-  private val path        = "slick.dbs.default.db"
   private val forceAccess = true
   private val databaseDef = dbConfigProvider.get[JdbcProfile].db
   private val hikariDataSource =
@@ -38,9 +32,10 @@ class RDSIAMPasswordUpdater @Inject()(
     FieldUtils.readField(hikariPool, "dataSource", forceAccess).asInstanceOf[DriverDataSource]
   private val driverProperties =
     FieldUtils.readField(driverDataSource, "driverProperties", forceAccess).asInstanceOf[Properties]
+  private val authTokenGenerator = RDSIAMAuthTokenGenerator.getGenerator(configuration)
 
   actorSystem.scheduler.schedule(initialDelay = 0.seconds, interval = 14.minutes) {
-    val rdsToken = RDSIAM.generateAuthToken(path, config)
+    val rdsToken = authTokenGenerator()
     hikariDataSource.ds.setPassword(rdsToken)
     driverProperties.put("password", rdsToken)
     Logger.info("Password Updated")
